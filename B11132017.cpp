@@ -36,21 +36,37 @@ int main()
     in_PLA_file.close();
 
     // Unit test to check the pla. file is read correctly
-    cout << var_amount << " " << pro_amount << endl;
-    for (string label : var_labels)
-        cout << label << " ";
-    cout << endl;
-    cout << out_label << endl;
-    for (Product x : products)
-        cout << x.literals << " " << x.type << endl;
-    return 0;
+    // cout << var_amount << " " << pro_amount << endl;
+    // for (string label : var_labels)
+    //     cout << label << " ";
+    // cout << endl;
+    // cout << out_label << endl;
+    // for (Product x : products)
+    //     cout << x.literals << " " << x.type << endl;
+    // return 0;
 
     vector<Product> list = make_minterm_list(var_amount);
     vector<Product> minterms = products_to_minterms(products, list);
-    // TODO: Unit test to check all products are convert into minterms correctly
+    // Unit test to check all products are convert into minterms correctly
+    for (Product x : minterms)
+    {
+        cout << x.literals << " " << x.type;
+        for (int y : x.added_minterms)
+            cout << " " << y;
+        cout << endl;
+    }
+    return 0;
 
     vector<Product> PI = QA_algorithm(minterms);
-    // TODO: Unit test to check all PIs are correct
+    // Unit test to check all PIs are correct
+    for (Product x : PI)
+    {
+        cout << x.literals << " " << x.type;
+        for (int y : x.added_minterms)
+            cout << " " << y;
+        cout << endl;
+    }
+    return 0;
 
     vector<Product> EPI;
     // TODO: Find minterms which are wrapped by only one PI and push them into EPI first, and then remove them from PI
@@ -130,7 +146,7 @@ vector<Product> make_minterm_list(int &var_amount)
     return list;
 }
 
-// TODO: Complete it
+// TODO: Complete it, minterms need to be sorted from m0 ~ mn
 vector<Product> products_to_minterms(vector<Product> &products, vector<Product> &minterms_list)
 {
     vector<Product> minterms;
@@ -151,8 +167,17 @@ void Patrick_method(vector<Product> &PI)
 {
 }
 
-// TODO: Complete it
 void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &var_labels, vector<Product> &EPI)
 {
+    out_PLA_file << ".p " << var_labels.size() << endl;
+    out_PLA_file << ".o 1" << endl;
+    out_PLA_file << ".ilb";
+    for (string x : var_labels)
+        out_PLA_file << " " << x;
+    out_PLA_file << endl;
+    out_PLA_file << ".ob " << out_label << endl;
+    out_PLA_file << ".p " << EPI.size() << endl;
+    for (Product x : EPI)
+        out_PLA_file << x.literals << " " << x.type << endl;
     cout << ".e";
 }
