@@ -12,9 +12,11 @@ using namespace std;
 void read_PLA_file(ifstream &in_PLA_file, int &var_amount, int &pro_amount, string &out_label,
                    vector<string> &var_labels, vector<Product> &products);
 
+void find_minterm_recursion(int &var_amount, int &ordinal, string &minterm, vector<Product> &list);
+
 vector<Product> make_minterm_list(int &var_amount);
 
-vector<Product> products_to_minterms(vector<Product> &products, vector<Product> &minterms_list);
+vector<Product> products_to_minterms(int &var_amount, vector<Product> &products, vector<Product> &minterms_list);
 
 vector<Product> QA_algorithm(vector<Product> &minterms);
 
@@ -46,8 +48,13 @@ int main()
     // return 0;
 
     vector<Product> list = make_minterm_list(var_amount);
-    vector<Product> minterms = products_to_minterms(products, list);
-    // Unit test to check all products are convert into minterms correctly
+    // Unit test to check the list of minterms is correct
+    // for (Product x : list)
+    //     cout << x.literals << endl;
+    // return 0;
+
+    vector<Product> minterms = products_to_minterms(var_amount, products, list);
+    // Unit test to check all products are convert into necessary minterms correctly
     for (Product x : minterms)
     {
         cout << x.literals << " " << x.type;
@@ -138,23 +145,90 @@ void read_PLA_file(ifstream &in_PLA_file, int &var_amount, int &pro_amount, stri
     }
 }
 
-// TODO: Complete it
+void find_minterm_recursion(int &var_amount, int &ordinal, string &minterm, vector<Product> &list)
+{
+    if (minterm.size() == var_amount)
+    {
+        Product tmp;
+        tmp.literals = minterm;
+        tmp.added_minterms.push_back(ordinal);
+        list.push_back(tmp);
+        ordinal++;
+        minterm.pop_back();
+        return;
+    }
+
+    minterm.push_back('0');
+    find_minterm_recursion(var_amount, ordinal, minterm, list);
+    minterm.push_back('1');
+    find_minterm_recursion(var_amount, ordinal, minterm, list);
+    minterm.pop_back();
+    return;
+}
+
 vector<Product> make_minterm_list(int &var_amount)
 {
+    int start_num = 0;
     vector<Product> list;
+    string minterm;
+
+    find_minterm_recursion(var_amount, start_num, minterm, list);
 
     return list;
 }
 
-// TODO: Complete it, minterms need to be sorted from m0 ~ mn
-vector<Product> products_to_minterms(vector<Product> &products, vector<Product> &minterms_list)
+// FIXME: Complete it, each minterm can appear only once, need to check
+vector<Product> products_to_minterms(int &var_amount, vector<Product> &products, vector<Product> &minterms_list)
 {
-    vector<Product> minterms;
+    vector<Product> minterms; // A vector stores all necessary component minterms 
+
+    // Use list to extract the necessary minterms from all products that are read from pla
+    for (Product check : minterms_list)
+    {
+        bool is_component = true;
+        for (Product be_checked : products)
+        {
+            for (int i = 0; i < var_amount; i++)
+            {
+                if (be_checked.literals[i] != not_care)
+                {
+                    if (be_checked.literals[i] != check.literals[i])
+                    {
+                        is_component = false;
+                        break;
+                    }
+                }
+            }
+
+            // If current minterm is the component of that product, it must be new to the previous minterms to push into vector
+            if (is_component)
+            {
+                bool is_new = true;
+                for (Product already_in : minterms)
+                {
+                    if (check.added_minterms == already_in.added_minterms)
+                    {
+                        is_new = false;
+                        break;
+                    }
+                }
+                if (is_new)
+                {
+                    Product tmp;
+                    tmp.literals = check.literals;
+                    tmp.added_minterms = check.added_minterms;
+                    tmp.type = be_checked.type;
+                    minterms.push_back(tmp);
+                }
+                break;
+            }
+        }
+    }
 
     return minterms;
 }
 
-// TODO: Complete it
+// TODO: Complete it: mapping minterms according to the num of 1, and simplify them until can't do the simplification anymore
 vector<Product> QA_algorithm(vector<Product> &minterms)
 {
     vector<Product> PI;
@@ -169,6 +243,18 @@ void Patrick_method(vector<Product> &PI)
 
 void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &var_labels, vector<Product> &EPI)
 {
+    cout << "Total number of terms: " << EPI.size() << endl;
+    int literals_num = 0;
+    for (Product x : EPI)
+    {
+        for (int i = 0; i < x.literals.size(); i++)
+        {
+            if (x.literals[i] != not_care)
+                literals_num++;
+        }
+    }
+    cout << "Total number of literals: " << literals_num << endl;
+
     out_PLA_file << ".p " << var_labels.size() << endl;
     out_PLA_file << ".o 1" << endl;
     out_PLA_file << ".ilb";
@@ -179,5 +265,5 @@ void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &v
     out_PLA_file << ".p " << EPI.size() << endl;
     for (Product x : EPI)
         out_PLA_file << x.literals << " " << x.type << endl;
-    cout << ".e";
+    out_PLA_file << ".e";
 }
