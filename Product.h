@@ -8,7 +8,7 @@ class Product
 {
 public:
     string literals;
-    vector<int> added_minterms;
+    vector<int> merged_minterms;
     char type;
     bool has_checked = false;
 };

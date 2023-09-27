@@ -2,6 +2,7 @@
 #include <fstream>
 #include <math.h>
 #include <vector>
+#include <map>
 #include <string>
 #include <sstream>
 #include "Product.h"
@@ -16,9 +17,14 @@ void find_minterm_recursion(int &var_amount, int &ordinal, string &minterm, vect
 
 vector<Product> make_minterm_list(int &var_amount);
 
+// This function is to extract all possible minterms from read-in pla file
 vector<Product> products_to_minterms(int &var_amount, vector<Product> &products, vector<Product> &minterms_list);
 
-vector<Product> QA_algorithm(vector<Product> &minterms);
+map<int, vector<Product>> sort_by_1_amount(int &var_amount, vector<Product> &minterms);
+
+void merging_map(map<int, vector<Product>> &unmerged, int max_of_1, bool do_again, int &digit_amount, vector<Product> &PI);
+
+vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms);
 
 void Patrick_method(vector<Product> &PI);
 
@@ -55,29 +61,33 @@ int main()
 
     vector<Product> minterms = products_to_minterms(var_amount, products, list);
     // Unit test to check all products are convert into necessary minterms correctly
-    for (Product x : minterms)
-    {
-        cout << x.literals << " " << x.type;
-        for (int y : x.added_minterms)
-            cout << " " << y;
-        cout << endl;
-    }
-    return 0;
+    // for (Product x : minterms)
+    // {
+    //     cout << x.literals << " " << x.type;
+    //     for (int y : x.merged_minterms)
+    //         cout << " " << y;
+    //     cout << endl;
+    // }
+    // return 0;
 
-    vector<Product> PI = QA_algorithm(minterms);
+    vector<Product> PI = QA_algorithm(var_amount, minterms);
+    // return 0;
+
     // Unit test to check all PIs are correct
     for (Product x : PI)
     {
         cout << x.literals << " " << x.type;
-        for (int y : x.added_minterms)
+        for (int y : x.merged_minterms)
             cout << " " << y;
         cout << endl;
     }
     return 0;
 
+    // TODO: Remove not-care minterms from vector "minterms"
     vector<Product> EPI;
     // TODO: Find minterms which are wrapped by only one PI and push them into EPI first, and then remove them from PI
 
+    // TODO: Remove minterms that are already wrapped up from vector "minterms"
     Patrick_method(PI); // Find required EPI from the remaining PIs
 
     write_PLA_file(out_PLA_file, out_label, var_labels, EPI);
@@ -151,7 +161,7 @@ void find_minterm_recursion(int &var_amount, int &ordinal, string &minterm, vect
     {
         Product tmp;
         tmp.literals = minterm;
-        tmp.added_minterms.push_back(ordinal);
+        tmp.merged_minterms.push_back(ordinal);
         list.push_back(tmp);
         ordinal++;
         minterm.pop_back();
@@ -177,17 +187,17 @@ vector<Product> make_minterm_list(int &var_amount)
     return list;
 }
 
-// FIXME: Complete it, each minterm can appear only once, need to check
+// This function is to extract all possible minterms from read-in pla file
 vector<Product> products_to_minterms(int &var_amount, vector<Product> &products, vector<Product> &minterms_list)
 {
-    vector<Product> minterms; // A vector stores all necessary component minterms 
+    vector<Product> minterms; // A vector stores all necessary component minterms
 
     // Use list to extract the necessary minterms from all products that are read from pla
     for (Product check : minterms_list)
     {
-        bool is_component = true;
         for (Product be_checked : products)
         {
+            bool is_component = true;
             for (int i = 0; i < var_amount; i++)
             {
                 if (be_checked.literals[i] != not_care)
@@ -206,7 +216,7 @@ vector<Product> products_to_minterms(int &var_amount, vector<Product> &products,
                 bool is_new = true;
                 for (Product already_in : minterms)
                 {
-                    if (check.added_minterms == already_in.added_minterms)
+                    if (check.merged_minterms == already_in.merged_minterms)
                     {
                         is_new = false;
                         break;
@@ -216,7 +226,7 @@ vector<Product> products_to_minterms(int &var_amount, vector<Product> &products,
                 {
                     Product tmp;
                     tmp.literals = check.literals;
-                    tmp.added_minterms = check.added_minterms;
+                    tmp.merged_minterms = check.merged_minterms;
                     tmp.type = be_checked.type;
                     minterms.push_back(tmp);
                 }
@@ -228,11 +238,133 @@ vector<Product> products_to_minterms(int &var_amount, vector<Product> &products,
     return minterms;
 }
 
-// TODO: Complete it: mapping minterms according to the num of 1, and simplify them until can't do the simplification anymore
-vector<Product> QA_algorithm(vector<Product> &minterms)
+map<int, vector<Product>> sort_by_1_amount(int &max_of_1, vector<Product> &minterms)
+{
+    map<int, vector<Product>> sorted_map;
+    for (int num_of_1 = 0; num_of_1 <= max_of_1; num_of_1++)
+    {
+        vector<Product> tmp;
+        for (Product x : minterms)
+        {
+            int equal_1_num = 0;
+            for (char digit : x.literals)
+            {
+                if (digit == '1')
+                    equal_1_num++;
+            }
+            if (equal_1_num == num_of_1)
+                tmp.push_back(x);
+        }
+        if (tmp.size() != 0)
+            sorted_map[num_of_1] = tmp;
+    }
+    return sorted_map;
+}
+
+void merging_map(map<int, vector<Product>> &unmerged, int max_of_1, bool do_again, int &digit_amount, vector<Product> &PI)
+{
+    if (!do_again)
+        return;
+
+    bool have_changed = false;
+    vector<Product> merged_result;
+    for (int i = 0; i <= max_of_1; i++)
+    {
+        for (int j = i + 1; j <= max_of_1 + 1; j++)
+        {
+            for (Product x : unmerged[i])
+            {
+                for (Product y : unmerged[j])
+                {
+                    vector<int> differ_digit_index;
+                    for (int i = 0; i < digit_amount; i++)
+                    {
+                        if (x.literals[i] != y.literals[i])
+                            differ_digit_index.push_back(i);
+                    }
+                    if (differ_digit_index.size() == 1) // Going to merge
+                    {
+                        have_changed = true;
+                        x.has_checked = true;
+                        y.has_checked = true;
+                        Product merged;
+                        merged.literals = x.literals;
+                        merged.literals[differ_digit_index[0]] = not_care;
+                        // Record this product is composed of what minterms
+                        for (int x_merged_minterms : x.merged_minterms)
+                            merged.merged_minterms.push_back(x_merged_minterms);
+                        for (int y_merged_minterms : y.merged_minterms)
+                            merged.merged_minterms.push_back(y_merged_minterms);
+                        merged_result.push_back(merged);
+                    }
+                }
+            }
+        }
+    }
+
+    // If there are some minterms that don't merge with others, then those minterms are PI.
+    for (const auto &pair : unmerged)
+    {
+        for (Product x : pair.second)
+        {
+            if (!x.has_checked)
+                PI.push_back(x);
+        }
+    }
+
+    unmerged.clear();
+    unmerged = sort_by_1_amount(max_of_1, merged_result);
+
+    // TODO: Delete duplicate Product in each layer
+    for (auto &pair : unmerged)
+    {
+        vector<Product> tmp = pair.second;
+        for (int i = 0; i < tmp.size() - 1; i++)
+        {
+            for (int j = i + 1; j < tmp.size(); j++)
+            {
+                // Once find a duplicate, delete it and restart the loop
+                if (tmp[j].literals == tmp[i].literals)
+                {
+                    tmp.erase(tmp.begin() + j);
+                    j = i;
+                }
+            }
+        }
+        pair.second = tmp;
+    }
+
+    merging_map(unmerged, max_of_1 - 1, have_changed, digit_amount, PI);
+}
+
+// TODO: Complete it: complete merging_map()
+vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms)
 {
     vector<Product> PI;
+    // Init map of minterms according to the num of 1
+    map<int, vector<Product>> init_map = sort_by_1_amount(var_amount, minterms);
+    // Unit test to verify init map is correct
+    // for (const auto &pair : init_map)
+    // {
+    //     cout << pair.first << endl;
+    //     for (Product x : pair.second)
+    //     {
+    //         for (int merged_minterm : x.merged_minterms)
+    //             cout << merged_minterm << " ";
+    //         cout << x.literals << endl;
+    //     }
+    // }
+    // goto check_sort_function;
 
+    merging_map(init_map, var_amount - 1, true, var_amount, PI);
+
+    for (const auto &pair : init_map /*Has become can't-merge-anymore map*/)
+    {
+        for (Product merged_product : pair.second)
+            PI.push_back(merged_product);
+    }
+
+    // check_sort_function:
     return PI;
 }
 
