@@ -22,11 +22,12 @@ vector<Product> products_to_minterms(int &var_amount, vector<Product> &products,
 
 map<int, vector<Product>> sort_by_1_amount(int &var_amount, vector<Product> &minterms);
 
+// Merge map by recursion
 void merging_map(map<int, vector<Product>> &unmerged, int max_of_1, bool do_again, int &digit_amount, vector<Product> &PI);
 
 vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms);
 
-void Patrick_method(vector<Product> &PI);
+void Patrick_method(vector<Product> &PI, vector<Product> &minterms, vector<Product> &EPI);
 
 void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &var_labels, vector<Product> &EPI);
 
@@ -74,21 +75,88 @@ int main()
     // return 0;
 
     // Unit test to check all PIs are correct
-    for (Product x : PI)
+    // for (const Product &x : PI)
+    // {
+    //     cout << x.literals;
+    //     for (int y : x.merged_minterms)
+    //         cout << " " << y;
+    //     cout << endl;
+    // }
+    // return 0;
+
+    // Remove not-care minterms from vector "minterms" because we don'y need those minterms anymore
+    for (int i = 0; i < minterms.size(); i++)
     {
-        cout << x.literals << " " << x.type;
-        for (int y : x.merged_minterms)
-            cout << " " << y;
-        cout << endl;
+        if (minterms[i].type == not_care)
+        {
+            minterms.erase(minterms.begin() + i);
+            i = -1;
+        }
     }
-    return 0;
-
-    // TODO: Remove not-care minterms from vector "minterms"
     vector<Product> EPI;
-    // TODO: Find minterms which are wrapped by only one PI and push them into EPI first, and then remove them from PI
+    // FIXME: Find minterms which are wrapped by only one PI and push them into EPI first, and then remove them from PI, need check!
+    vector<vector<bool>> first_patrick_form(minterms.size(), vector<bool>(PI.size(), false));
+    for (int product_index = 0; product_index < PI.size(); product_index++)
+    {
+        for (int merged_minterm : PI[product_index].merged_minterms)
+        {
+            for (Product minterm : minterms)
+            {
+                for (int minterm_index : minterm.merged_minterms)
+                {
+                    if (merged_minterm == minterm_index)
+                    {
+                        first_patrick_form[minterm_index][merged_minterm] = true;
+                    }
+                }
+            }
+        }
+    }
+    for (int minterm_index; minterms.size(); minterm_index++)
+    {
+        int own_amount = 0;
+        for (bool x : first_patrick_form[minterm_index])
+        {
+            if (x)
+                own_amount++;
+        }
+        if (own_amount == 1)
+        {
+            for (int target_PI_idx = 0; target_PI_idx < PI.size(); target_PI_idx++)
+            {
+                if (first_patrick_form[minterm_index][target_PI_idx])
+                {
+                    EPI.push_back(PI[target_PI_idx]);
+                    PI.erase(PI.begin() + target_PI_idx);
+                    break;
+                }
+            }
+        }
+    }
 
-    // TODO: Remove minterms that are already wrapped up from vector "minterms"
-    Patrick_method(PI); // Find required EPI from the remaining PIs
+    // FIXME: Remove minterms that are already wrapped up from vector "minterms", need check!
+    for (int i = 0; i < minterms.size(); i++)
+    {
+        for (int minterm_idx : minterms[i].merged_minterms)
+        {
+            for (Product x : EPI)
+            {
+                for (int confirm_minterm_idx : x.merged_minterms)
+                {
+                    if (minterm_idx == confirm_minterm_idx)
+                    {
+                        minterms.erase(minterms.begin() + i);
+                        i = -1;
+                        goto check_next_minterm;
+                    }
+                }
+            }
+        }
+    check_next_minterm:
+        continue;
+    }
+
+    Patrick_method(PI, minterms, EPI); // Find required EPI from the remaining PIs
 
     write_PLA_file(out_PLA_file, out_label, var_labels, EPI);
     out_PLA_file.close();
@@ -272,9 +340,9 @@ void merging_map(map<int, vector<Product>> &unmerged, int max_of_1, bool do_agai
     {
         for (int j = i + 1; j <= max_of_1 + 1; j++)
         {
-            for (Product x : unmerged[i])
+            for (Product &x : unmerged[i]) // Must be call-by-reference
             {
-                for (Product y : unmerged[j])
+                for (Product &y : unmerged[j]) // Must be call-by-reference
                 {
                     vector<int> differ_digit_index;
                     for (int i = 0; i < digit_amount; i++)
@@ -284,18 +352,31 @@ void merging_map(map<int, vector<Product>> &unmerged, int max_of_1, bool do_agai
                     }
                     if (differ_digit_index.size() == 1) // Going to merge
                     {
+                        bool is_new = true;
                         have_changed = true;
                         x.has_checked = true;
                         y.has_checked = true;
                         Product merged;
                         merged.literals = x.literals;
                         merged.literals[differ_digit_index[0]] = not_care;
-                        // Record this product is composed of what minterms
-                        for (int x_merged_minterms : x.merged_minterms)
-                            merged.merged_minterms.push_back(x_merged_minterms);
-                        for (int y_merged_minterms : y.merged_minterms)
-                            merged.merged_minterms.push_back(y_merged_minterms);
-                        merged_result.push_back(merged);
+                        // Ignore duplicate Product when merging
+                        for (Product already_in : merged_result)
+                        {
+                            if (merged.literals == already_in.literals)
+                            {
+                                is_new = false;
+                                break;
+                            }
+                        }
+                        if (is_new)
+                        {
+                            // Record this product is composed of what minterms
+                            for (int x_merged_minterms : x.merged_minterms)
+                                merged.merged_minterms.push_back(x_merged_minterms);
+                            for (int y_merged_minterms : y.merged_minterms)
+                                merged.merged_minterms.push_back(y_merged_minterms);
+                            merged_result.push_back(merged);
+                        }
                     }
                 }
             }
@@ -315,29 +396,9 @@ void merging_map(map<int, vector<Product>> &unmerged, int max_of_1, bool do_agai
     unmerged.clear();
     unmerged = sort_by_1_amount(max_of_1, merged_result);
 
-    // TODO: Delete duplicate Product in each layer
-    for (auto &pair : unmerged)
-    {
-        vector<Product> tmp = pair.second;
-        for (int i = 0; i < tmp.size() - 1; i++)
-        {
-            for (int j = i + 1; j < tmp.size(); j++)
-            {
-                // Once find a duplicate, delete it and restart the loop
-                if (tmp[j].literals == tmp[i].literals)
-                {
-                    tmp.erase(tmp.begin() + j);
-                    j = i;
-                }
-            }
-        }
-        pair.second = tmp;
-    }
-
     merging_map(unmerged, max_of_1 - 1, have_changed, digit_amount, PI);
 }
 
-// TODO: Complete it: complete merging_map()
 vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms)
 {
     vector<Product> PI;
@@ -369,7 +430,7 @@ vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms)
 }
 
 // TODO: Complete it
-void Patrick_method(vector<Product> &PI)
+void Patrick_method(vector<Product> &PI, vector<Product> &minterms, vector<Product> &EPI)
 {
 }
 
