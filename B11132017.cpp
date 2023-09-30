@@ -13,8 +13,10 @@ using namespace std;
 void read_PLA_file(ifstream &in_PLA_file, int &var_amount, int &pro_amount, string &out_label,
                    vector<string> &var_labels, vector<Product> &products);
 
+// According the amount of variables to find all minterms' form
 void find_minterm_recursion(int &var_amount, int &ordinal, string &minterm, vector<Product> &list);
 
+// Make a list of all minterms in order to compare with the read-in products easily
 vector<Product> make_minterm_list(int &var_amount);
 
 // This function is to extract all possible minterms from read-in pla file
@@ -27,6 +29,13 @@ void merging_map(map<int, vector<Product>> &unmerged, int max_of_1, bool do_agai
 
 vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms);
 
+// Create a 2D boolean chart according to "unwrapped minterms" and PI
+vector<vector<bool>> create_patrick_chart(vector<Product> &minterms, vector<Product> &PI);
+
+// Do polynomial multiplication by recursion
+void do_poly_multi(vector<vector<string>> &un_simplify);
+
+// Get EPI from the remaining PI
 void Patrick_method(vector<Product> &PI, vector<Product> &minterms, vector<Product> &EPI);
 
 void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &var_labels, vector<Product> &EPI);
@@ -38,8 +47,8 @@ int main()
     string out_label;
     vector<string> var_labels;
     vector<Product> products;
-    ifstream in_PLA_file("Pro_1.pla");
-    ofstream out_PLA_file("Pro_1_out.pla");
+    ifstream in_PLA_file("TA_3.pla");
+    ofstream out_PLA_file("TA_3_out.pla");
 
     read_PLA_file(in_PLA_file, var_amount, pro_amount, out_label, var_labels, products);
     in_PLA_file.close();
@@ -71,7 +80,7 @@ int main()
     // }
     // return 0;
 
-    vector<Product> PI = QA_algorithm(var_amount, minterms);
+    vector<Product> PI = QA_algorithm(var_amount, minterms); // Find PI from necessary minterms
     // return 0;
 
     // Unit test to check all PIs are correct
@@ -94,47 +103,49 @@ int main()
         }
     }
     vector<Product> EPI;
-    // FIXME: Find minterms which are wrapped by only one PI and push them into EPI first, and then remove them from PI, need check!
-    vector<vector<bool>> first_patrick_form(minterms.size(), vector<bool>(PI.size(), false));
-    for (int product_index = 0; product_index < PI.size(); product_index++)
+    // Find minterms which are wrapped by only one PI and push them into EPI first, and then remove them from PI
+    vector<vector<bool>> chart_before_patrick = create_patrick_chart(minterms, PI);
+    for (int i = 0; i < chart_before_patrick.size(); i++) // Push into EPI
     {
-        for (int merged_minterm : PI[product_index].merged_minterms)
+        int have_amount = 0;
+        for (int j = 0; j < chart_before_patrick[i].size(); j++)
         {
-            for (Product minterm : minterms)
+            if (chart_before_patrick[i][j])
+                have_amount++;
+        }
+        if (have_amount == 1)
+        {
+            for (int j = 0; j < chart_before_patrick[i].size(); j++)
             {
-                for (int minterm_index : minterm.merged_minterms)
+                if (chart_before_patrick[i][j]) 
                 {
-                    if (merged_minterm == minterm_index)
+                    bool is_new = true;
+                    for (Product already_in : EPI) // Push if it is new to EPI
                     {
-                        first_patrick_form[minterm_index][merged_minterm] = true;
+                        if (PI[j].literals == already_in.literals)
+                        {
+                            is_new = false;
+                            break;
+                        }
                     }
+                    if (is_new)
+                        EPI.push_back(PI[j]);
                 }
             }
         }
     }
-    for (int minterm_index; minterms.size(); minterm_index++)
+    for (Product x : EPI) // Remove them from PI
     {
-        int own_amount = 0;
-        for (bool x : first_patrick_form[minterm_index])
+        for (int i = 0; i < PI.size(); i++)
         {
-            if (x)
-                own_amount++;
-        }
-        if (own_amount == 1)
-        {
-            for (int target_PI_idx = 0; target_PI_idx < PI.size(); target_PI_idx++)
+            if (PI[i].literals == x.literals)
             {
-                if (first_patrick_form[minterm_index][target_PI_idx])
-                {
-                    EPI.push_back(PI[target_PI_idx]);
-                    PI.erase(PI.begin() + target_PI_idx);
-                    break;
-                }
+                PI.erase(PI.begin() + i);
+                break;
             }
         }
     }
-
-    // FIXME: Remove minterms that are already wrapped up from vector "minterms", need check!
+    // Remove minterms that are already wrapped up from vector "minterms"
     for (int i = 0; i < minterms.size(); i++)
     {
         for (int minterm_idx : minterms[i].merged_minterms)
@@ -255,7 +266,6 @@ vector<Product> make_minterm_list(int &var_amount)
     return list;
 }
 
-// This function is to extract all possible minterms from read-in pla file
 vector<Product> products_to_minterms(int &var_amount, vector<Product> &products, vector<Product> &minterms_list)
 {
     vector<Product> minterms; // A vector stores all necessary component minterms
@@ -429,9 +439,106 @@ vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms)
     return PI;
 }
 
-// TODO: Complete it
+vector<vector<bool>> create_patrick_chart(vector<Product> &minterms, vector<Product> &PI)
+{
+    vector<vector<bool>> chart(minterms.size(), vector<bool>(PI.size(), false));
+    for (int which_minterm = 0; which_minterm < minterms.size(); which_minterm++) // Traverse all necessary minterms
+    {
+        for (int which_product = 0; which_product < PI.size(); which_product++) // Traverse all PI
+        {
+            for (int minterm_idx : minterms[which_minterm].merged_minterms)
+            {
+                for (int merged_idx : PI[which_product].merged_minterms)
+                {
+                    if (merged_idx == minterm_idx)
+                        chart[which_minterm][which_product] = true;
+                }
+            }
+        }
+    }
+    return chart;
+}
+
+void do_poly_multi(vector<vector<string>> &un_simplify)
+{
+    if (un_simplify.size() == 1)
+        return;
+
+    vector<string> new_product;
+    for (int i = 0; i < un_simplify[0].size(); i++)
+    {
+        for (int j = 0; j < un_simplify[1].size(); j++)
+        {
+            if (un_simplify[0][i].find(un_simplify[1][j]) == string::npos)
+            {
+                string tmp = un_simplify[0][i] + " " + un_simplify[1][j];
+                new_product.push_back(tmp);
+            }
+            else
+                new_product.push_back(un_simplify[0][i]);
+        }
+    }
+    un_simplify[0] = new_product;
+    un_simplify.erase(un_simplify.begin() + 1);
+    do_poly_multi(un_simplify);
+}
+
 void Patrick_method(vector<Product> &PI, vector<Product> &minterms, vector<Product> &EPI)
 {
+    if (minterms.size() == 0) // If there's no minterms to extract from PI, then don't do patrick method
+        return;
+
+    vector<vector<bool>> chart = create_patrick_chart(minterms, PI);
+    vector<vector<string>> poly_multi_result;
+
+    for (int i = 0; i < chart.size(); i++) // Init poly_multi_result
+    {
+        vector<string> tmp;
+        for (int j = 0; j < chart[i].size(); j++)
+        {
+            if (chart[i][j])
+                tmp.push_back(PI[j].literals);
+        }
+        poly_multi_result.push_back(tmp);
+    }
+
+    do_poly_multi(poly_multi_result);
+
+    int least_term_amount = INT32_MAX; // init this with the MAX of int
+    for (string x : poly_multi_result[0])
+    {
+        int space_amount = 0;
+        for (char y : x)
+        {
+            if (y == ' ')
+                space_amount++;
+        }
+        if (space_amount + 1 < least_term_amount)
+            least_term_amount = space_amount + 1;
+    }
+
+    for (string x : poly_multi_result[0])
+    {
+        int space_amount = 0;
+        for (char y : x)
+        {
+            if (y == ' ')
+                space_amount++;
+        }
+        if (space_amount + 1 == least_term_amount)
+        {
+            stringstream product;
+            string tmp;
+            product << x;
+            while (product >> tmp)
+            {
+                Product target_PI;
+                target_PI.literals = tmp;
+                EPI.push_back(target_PI);
+            }
+            break;
+        }
+    }
 }
 
 void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &var_labels, vector<Product> &EPI)
@@ -457,6 +564,6 @@ void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &v
     out_PLA_file << ".ob " << out_label << endl;
     out_PLA_file << ".p " << EPI.size() << endl;
     for (Product x : EPI)
-        out_PLA_file << x.literals << " " << x.type << endl;
-    out_PLA_file << ".e";
+        out_PLA_file << x.literals << " 1" << endl;
+    out_PLA_file << ".e" << endl;
 }
