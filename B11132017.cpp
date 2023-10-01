@@ -7,7 +7,6 @@
 #include <sstream>
 #include "Product.h"
 using namespace std;
-
 #define not_care '-'
 
 void read_PLA_file(ifstream &in_PLA_file, int &var_amount, int &pro_amount, string &out_label,
@@ -15,84 +14,38 @@ void read_PLA_file(ifstream &in_PLA_file, int &var_amount, int &pro_amount, stri
 
 // According the amount of variables to find all minterms' form
 void find_minterm_recursion(int &var_amount, int &ordinal, string &minterm, vector<Product> &list);
-
 // Make a list of all minterms in order to compare with the read-in products easily
 vector<Product> make_minterm_list(int &var_amount);
-
 // This function is to extract all possible minterms from read-in pla file
 vector<Product> products_to_minterms(int &var_amount, vector<Product> &products, vector<Product> &minterms_list);
-
 map<int, vector<Product>> sort_by_1_amount(int &var_amount, vector<Product> &minterms);
-
 // Merge map by recursion
 void merging_map(map<int, vector<Product>> &unmerged, int max_of_1, bool do_again, int &digit_amount, vector<Product> &PI);
-
 vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms);
-
 // Create a 2D boolean chart according to "unwrapped minterms" and PI
 vector<vector<bool>> create_patrick_chart(vector<Product> &minterms, vector<Product> &PI);
-
 // Do polynomial multiplication by recursion
 void do_poly_multi(vector<vector<string>> &un_simplify);
-
 // Get EPI from the remaining PI
 void Patrick_method(vector<Product> &PI, vector<Product> &minterms, vector<Product> &EPI);
-
 void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &var_labels, vector<Product> &EPI);
 
-int main()
+int main(int argc, char *argv[])
 {
     int var_amount;
     int pro_amount = 0;
     string out_label;
     vector<string> var_labels;
     vector<Product> products;
-    ifstream in_PLA_file("TA_3.pla");
-    ofstream out_PLA_file("TA_3_out.pla");
+    ifstream in_PLA_file(argv[1]);
+    ofstream out_PLA_file(argv[2]);
 
     read_PLA_file(in_PLA_file, var_amount, pro_amount, out_label, var_labels, products);
     in_PLA_file.close();
 
-    // Unit test to check the pla. file is read correctly
-    // cout << var_amount << " " << pro_amount << endl;
-    // for (string label : var_labels)
-    //     cout << label << " ";
-    // cout << endl;
-    // cout << out_label << endl;
-    // for (Product x : products)
-    //     cout << x.literals << " " << x.type << endl;
-    // return 0;
-
     vector<Product> list = make_minterm_list(var_amount);
-    // Unit test to check the list of minterms is correct
-    // for (Product x : list)
-    //     cout << x.literals << endl;
-    // return 0;
-
     vector<Product> minterms = products_to_minterms(var_amount, products, list);
-    // Unit test to check all products are convert into necessary minterms correctly
-    // for (Product x : minterms)
-    // {
-    //     cout << x.literals << " " << x.type;
-    //     for (int y : x.merged_minterms)
-    //         cout << " " << y;
-    //     cout << endl;
-    // }
-    // return 0;
-
     vector<Product> PI = QA_algorithm(var_amount, minterms); // Find PI from necessary minterms
-    // return 0;
-
-    // Unit test to check all PIs are correct
-    // for (const Product &x : PI)
-    // {
-    //     cout << x.literals;
-    //     for (int y : x.merged_minterms)
-    //         cout << " " << y;
-    //     cout << endl;
-    // }
-    // return 0;
-
     // Remove not-care minterms from vector "minterms" because we don'y need those minterms anymore
     for (int i = 0; i < minterms.size(); i++)
     {
@@ -117,7 +70,7 @@ int main()
         {
             for (int j = 0; j < chart_before_patrick[i].size(); j++)
             {
-                if (chart_before_patrick[i][j]) 
+                if (chart_before_patrick[i][j])
                 {
                     bool is_new = true;
                     for (Product already_in : EPI) // Push if it is new to EPI
@@ -260,16 +213,13 @@ vector<Product> make_minterm_list(int &var_amount)
     int start_num = 0;
     vector<Product> list;
     string minterm;
-
     find_minterm_recursion(var_amount, start_num, minterm, list);
-
     return list;
 }
 
 vector<Product> products_to_minterms(int &var_amount, vector<Product> &products, vector<Product> &minterms_list)
 {
     vector<Product> minterms; // A vector stores all necessary component minterms
-
     // Use list to extract the necessary minterms from all products that are read from pla
     for (Product check : minterms_list)
     {
@@ -287,7 +237,6 @@ vector<Product> products_to_minterms(int &var_amount, vector<Product> &products,
                     }
                 }
             }
-
             // If current minterm is the component of that product, it must be new to the previous minterms to push into vector
             if (is_component)
             {
@@ -312,7 +261,6 @@ vector<Product> products_to_minterms(int &var_amount, vector<Product> &products,
             }
         }
     }
-
     return minterms;
 }
 
@@ -414,28 +362,12 @@ vector<Product> QA_algorithm(int &var_amount, vector<Product> &minterms)
     vector<Product> PI;
     // Init map of minterms according to the num of 1
     map<int, vector<Product>> init_map = sort_by_1_amount(var_amount, minterms);
-    // Unit test to verify init map is correct
-    // for (const auto &pair : init_map)
-    // {
-    //     cout << pair.first << endl;
-    //     for (Product x : pair.second)
-    //     {
-    //         for (int merged_minterm : x.merged_minterms)
-    //             cout << merged_minterm << " ";
-    //         cout << x.literals << endl;
-    //     }
-    // }
-    // goto check_sort_function;
-
     merging_map(init_map, var_amount - 1, true, var_amount, PI);
-
     for (const auto &pair : init_map /*Has become can't-merge-anymore map*/)
     {
         for (Product merged_product : pair.second)
             PI.push_back(merged_product);
     }
-
-    // check_sort_function:
     return PI;
 }
 
@@ -490,7 +422,6 @@ void Patrick_method(vector<Product> &PI, vector<Product> &minterms, vector<Produ
 
     vector<vector<bool>> chart = create_patrick_chart(minterms, PI);
     vector<vector<string>> poly_multi_result;
-
     for (int i = 0; i < chart.size(); i++) // Init poly_multi_result
     {
         vector<string> tmp;
@@ -501,11 +432,9 @@ void Patrick_method(vector<Product> &PI, vector<Product> &minterms, vector<Produ
         }
         poly_multi_result.push_back(tmp);
     }
-
     do_poly_multi(poly_multi_result);
-
-    int least_term_amount = INT32_MAX; // init this with the MAX of int
-    for (string x : poly_multi_result[0])
+    int least_term_amount = INT32_MAX;    // init this with the MAX of int
+    for (string x : poly_multi_result[0]) // Find the amount of the least term
     {
         int space_amount = 0;
         for (char y : x)
@@ -516,8 +445,7 @@ void Patrick_method(vector<Product> &PI, vector<Product> &minterms, vector<Produ
         if (space_amount + 1 < least_term_amount)
             least_term_amount = space_amount + 1;
     }
-
-    for (string x : poly_multi_result[0])
+    for (string x : poly_multi_result[0]) // Find one result whose term num = the least amount, and push it into EPI
     {
         int space_amount = 0;
         for (char y : x)
@@ -554,7 +482,6 @@ void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &v
         }
     }
     cout << "Total number of literals: " << literals_num << endl;
-
     out_PLA_file << ".p " << var_labels.size() << endl;
     out_PLA_file << ".o 1" << endl;
     out_PLA_file << ".ilb";
