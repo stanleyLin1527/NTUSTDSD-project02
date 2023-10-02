@@ -1,0 +1,4 @@
+.i 6
+.o 1
+.ilb a b c d e f
+.ob f
