@@ -482,7 +482,7 @@ void write_PLA_file(ofstream &out_PLA_file, string &out_label, vector<string> &v
         }
     }
     cout << "Total number of literals: " << literals_num << endl;
-    out_PLA_file << ".p " << var_labels.size() << endl;
+    out_PLA_file << ".i " << var_labels.size() << endl;
     out_PLA_file << ".o 1" << endl;
     out_PLA_file << ".ilb";
     for (string x : var_labels)

@@ -1,12 +1,12 @@
 // Execute environment
-WSL(Ubuntu 22.04.3 LTS) (at 2023/9/30 P.M. 06:53)
+WSL(Ubuntu 22.04.3 LTS) (at 2023/10/3 P.M. 09:43)
 
 // GNU C++ Compiler version
-g++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0 (at 2023/9/30 P.M. 06:50)
-build-essential 12.9ubuntu3 (at 2023/9/30 P.M. 06:52)
+g++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0 (at 2023/10/3 P.M. 09:41)
+build-essential 12.9ubuntu3 (at 2023/10/3 P.M. 09:44)
 
 // GNU Debugger
-GNU gdb (Ubuntu 12.1-0ubuntu1~22.04) 12.1 (at 2023/9/30 P.M. 06:50)
+GNU gdb (Ubuntu 12.1-0ubuntu1~22.04) 12.1 (at 2023/10/3 P.M. 09:42)
 
 // how to compile
 (If you want to name program by yourself)
